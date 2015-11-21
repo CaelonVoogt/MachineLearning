@@ -1,0 +1,131 @@
+#Pratical Machine Learning Project
+
+#Introduction to the Project
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+#Data locations and Provider
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
+
+#Project Goals
+To predict the manner in which the individuals did the exercise (Which is the "classe" variable in the training set ) utilising any of the other variables to predict with.
+
+#Library Loading
+```{R}
+library(caret)
+library(randomForest)
+library(rattle)
+library(RColorBrewer)
+library(rpart)
+library(rpart.plot)
+```
+
+#Data Loading
+```{R}
+trainingdata <- read.csv( "./pml-training.csv" )
+testingdata <- read.csv( "./pml-testing.csv" )
+set.seed( 1000 )
+```
+
+#Paritioning the training data
+```{R}
+inTrain <- createDataPartition( trainingdata$classe, p=0.6, list=FALSE )
+PartTrainingdata <- trainingdata[inTrain,]
+PartTestingdata <- trainingdata[-inTrain,]
+```
+
+#Data Cleaning
+This step works through the data and removes the following:
+- Step 1 : The first seven columns contain data elements that are specific to the participants and therefore would not worth while predictors for the Prediction Model
+- Step 2 : Removal of Variables that have a Near Zero Variance
+- Step 3 : Removal of variables that have 60% or more of their values as NA
+- Step 4 : Complete the same steps for datasets "PartTestingdata" and "testingdata"
+
+####Step 1:
+```{R}
+datatemp <- 1:7
+PartTrainingdata <- PartTrainingdata[,-datatemp]
+dim( PartTrainingdata )
+```
+####Step 2: 
+```{R}
+ZeroVarData <- nearZeroVar( PartTrainingdata, saveMetrics=TRUE )
+PartTrainingdata <- PartTrainingdata[,!ZeroVarData$nzv]
+dim( PartTrainingdata )
+```
+####Step 3: 
+```{R}
+NAColumnNumbers <- vector()
+vectorIndex <- 0
+for( i in 1:ncol( PartTrainingdata ) )
+        { if( ( sum( is.na( PartTrainingdata[,i] ) ) / nrow( PartTrainingdata ) ) >= 0.60 )
+                { vectorIndex <- vectorIndex + 1
+                  NAColumnNumbers[vectorIndex] <- i
+                }
+        }
+PartTrainingdata <- PartTrainingdata[,-NAColumnNumbers]
+dim( PartTrainingdata )
+```
+####Step 4:
+```{R}
+var1 <- colnames( PartTrainingdata )
+var2 <- colnames( PartTrainingdata[,-53] )
+PartTestingdata <- PartTestingdata[var1]
+testingdata <- testingdata[var2]
+dim( PartTestingdata )
+dim( testingdata )
+```
+#Application Machine Learning Algorithms
+####Algorithm 1 : Decision Tree
+
+Building the model:
+```{R}
+modelFit1 <- rpart( classe ~ ., data=PartTrainingdata, method="class" )
+```
+
+Plot:
+```{R}
+fancyRpartPlot( modelFit1 )
+```
+
+Predicting:
+```{R}
+predictions1 <- predict( modelFit1, PartTestingdata, type = "class" )
+```
+
+Results:
+The Decision Tree Algorithm produces an Accuracy of 72.7%, Next we will try the Random Forests algorithm to compare the accuracy results.
+```{R}
+confusionMatrix( predictions1, PartTestingdata$classe )
+```
+
+####Algorithm 2: Random Forest
+
+Building the model:
+```{R}
+modelFit2 <- randomForest( classe ~. , data=PartTrainingdata )
+```
+
+Predicting:
+```{R}
+predictions2 <- predict( modelFit2, PartTestingdata, type = "class" )
+```
+
+Results:
+The Random Forest Algorithm produces an Accuracy of 99.2%.
+```{R}
+confusionMatrix( predictions2, PartTestingdata$classe )
+```
+#Conculsion
+The Random Forest Algorithm provided a better accuracy when compared to the Decision Tree Algorithm (99.2% vs 72.7%), 
+therefore the expected out-of-sample error rate is 0.8% (100 - 99.2%). 
+The Random Forest Algorithm will be used to predict the classes for the final samples
+
+#Predicting the Final Samples
+```{R}
+finalPredictions <- predict( modelFit2, testingdata, type= "class" )
+finalPredictions
+```
